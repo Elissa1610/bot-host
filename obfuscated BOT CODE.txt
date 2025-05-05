@@ -42,6 +42,8 @@ def log_keystroke(key):
     try:
         if isinstance(key, Key):
             key_str = str(key)
+        elif isinstance(key, KeyCode):
+            key_str = key.char if key.char else str(key)
         else:
             key_str = key.char if hasattr(key, 'char') and key.char else str(key)
         logging.info(key_str)
